@@ -6,3 +6,4 @@ node_modules
 .env
 app/service-account.json
 app/firebase-config.json
+.idea
