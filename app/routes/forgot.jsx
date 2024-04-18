@@ -1,18 +1,17 @@
-import { auth } from "../firebase-service";
+import { auth } from "~/firebase-service";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { Form, Link } from "@remix-run/react";
 import { redirect } from "@remix-run/node";
 
 //create a stylesheet ref for the auth.css file
-export let links = () => {
+export const links = () => {
   return [];
 };
 
-export let action = async ({ request }) => {
+export const action = async ({ request }) => {
   // pull in the form data from the request after the form is submitted
-  let formData = await request.formData();
-
-  let email = formData.get("email");
+  const formData = await request.formData();
+  const email = formData.get("email");
 
   // perform firebase send password reset email
   try {

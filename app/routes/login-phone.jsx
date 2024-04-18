@@ -1,4 +1,4 @@
-import { auth } from "../firebase-service";
+import { auth } from "~/firebase-service";
 import {
   signOut,
   RecaptchaVerifier,
@@ -12,7 +12,7 @@ import {
   useCatch,
   useFetcher,
 } from "@remix-run/react";
-import { sessionLogin } from "../fb.sessions.server";
+import { sessionLogin } from "~/fb.sessions.server";
 import { useEffect, useRef, useState } from "react";
 
 //create a stylesheet ref for the auth.css file
@@ -91,7 +91,7 @@ export default function LoginPhone() {
   /**
    * try to login with phone number
    */
-  const login = () => {
+  const login = async () => {
     await signOut(auth);
     
     signInWithPhoneNumber(

@@ -16,7 +16,7 @@ export const meta = () => ({
 });
 
 // https://remix.run/api/app#links
-export let links = () => {
+export const links = () => {
   return [
     { rel: "stylesheet", href: stylesUrl },
   ];

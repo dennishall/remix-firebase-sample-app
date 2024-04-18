@@ -1,15 +1,14 @@
 import { useLoaderData, Form, useFetcher } from "@remix-run/react";
 import { json } from "@remix-run/node";
 
-import { auth } from "../firebase-service";
-import { isSessionValid } from "~/fb.sessions.server";
-import { sessionLogout } from "../fb.sessions.server";
+import { auth } from "~/firebase-service";
+import { isSessionValid, sessionLogout } from "~/fb.sessions.server";
 
 // use loader to check for existing session
 export async function loader({ request }) {
   const { decodedClaims, error } = await isSessionValid(request, "/login");
 
-  const COLLECTION_NAME = "tryreactfire";
+  const COLLECTION_NAME = "invoices";
   const PROJECT_ID = decodedClaims.aud;
 
   const response = await fetch(
@@ -18,22 +17,11 @@ export async function loader({ request }) {
   const { documents } = await response.json();
 
   console.log("documents", JSON.stringify(documents));
-  const responseData = [];
-  documents.forEach((doc) => {
-    Object.keys(doc.fields).map((k) =>
-      responseData.push({
-        id: doc.name.substring(doc.name.lastIndexOf("/") + 1),
-        createTime: doc.createTime,
-        updateTime: doc.updateTime,
-        [k]: Object.values(doc.fields[k])[0],
-      })
-    );
-  });
 
   const data = {
     error,
     decodedClaims,
-    responseData,
+    responseData: documents,
   };
   return json(data);
 }
@@ -43,7 +31,7 @@ export async function action({ request }) {
 }
 
 // https://remix.run/api/conventions#meta
-export let meta = () => {
+export const meta = () => {
   return {
     title: "Remix Starter Firebase ",
     description: "Welcome to remix with firebase!",
@@ -54,7 +42,7 @@ export let meta = () => {
 export default function Index() {
   const logoutFetcher = useFetcher();
   const data = useLoaderData();
-  let greeting = data?.decodedClaims
+  const greeting = data?.decodedClaims
     ? "Logged In As: " + data?.decodedClaims?.email
     : "Log In My: friend";
 
@@ -71,8 +59,9 @@ export default function Index() {
         <h3>{greeting}</h3>
         <div>
           <button className="ui button" type="button" onClick={() => logout()}>
-            LOGOUT
+            Log Out
           </button>
+          <a href="/invoice">invoice</a>
         </div>
       </div>
       <div className="ui segment">
@@ -84,8 +73,9 @@ export default function Index() {
       <div className="ui segment">
         <div className="ui medium header">Querying Firestore Database</div>
         {data?.responseData?.map((m) => (
-          <div className="ui segment" key={m?.id}>
-            {m?.id} : {m?.name}
+          <div className="ui segment" key={m?.name}>
+            {m?.name} :
+            <pre>{JSON.stringify(m?.fields, null, 4)}</pre>
           </div>
         ))}
       </div>

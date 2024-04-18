@@ -4,12 +4,8 @@ import { redirect, createCookieSessionStorage } from "@remix-run/node"; // or "@
 // Initialize Firebase
 // ---------------------
 import * as admin from "firebase-admin";
-var serviceAccount = require("./service-account.json");
-if (admin.apps.length === 0) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
+import adminApp from './lib/firebase.admin.server';
+console.log({adminApp});
 
 /**
  * setup the session cookie to be used for firebase
@@ -23,7 +19,7 @@ const { getSession, commitSession, destroySession } =
       maxAge: 600,
       path: "/",
       sameSite: "lax",
-      secrets: ["f3cr@z7"],
+      secrets: ["S8f3cr@z7"],
       secure: true,
     },
   });
@@ -43,7 +39,11 @@ export const isSessionValid = async (request, redirectTo) => {
     const decodedClaims = await admin
       .auth()
       .verifySessionCookie(session.get("idToken"), true /** checkRevoked */);
-    return { success: true, decodedClaims };
+    return {
+      success: true,
+      decodedClaims,
+      isAdmin: decodedClaims?.uid === "B1bwZ5eYo6Qhjt9wtSLJHHClaNq2",
+    };
   } catch (error) {
     // Session cookie is unavailable or invalid. Force user to login.
     // return { error: error?.message };
@@ -85,7 +85,7 @@ const setCookieAndRedirect = async (
 export const sessionLogin = async (request, idToken, redirectTo) => {
 
   const token = await admin.auth().verifyIdToken(idToken);
-  console.log("idtoken verified", idToken)
+  console.log("idtoken verified", {token, idToken});
 
   return admin
     .auth()

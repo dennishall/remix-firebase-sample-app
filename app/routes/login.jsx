@@ -1,4 +1,4 @@
-import { auth } from "../firebase-service";
+import { auth } from "~/firebase-service";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -13,10 +13,10 @@ import {
   useFetcher,
 } from "@remix-run/react";
 import { useRef } from "react";
-import { sessionLogin } from "../fb.sessions.server";
+import { sessionLogin } from "~/fb.sessions.server";
 
 //create a stylesheet ref for the auth.css file
-export let links = () => {
+export const links = () => {
   return [];
 };
 
@@ -54,8 +54,8 @@ export async function loader({ request }) {
 
 // our action function will be launched when the submit button is clicked
 // this will sign in our firebase user and create our session and cookie using user.getIDToken()
-export let action = async ({ request }) => {
-  let formData = await request.formData();
+export const action = async ({ request }) => {
+  const formData = await request.formData();
 
   try {
     return await sessionLogin(request, formData.get("idToken"), "/");
