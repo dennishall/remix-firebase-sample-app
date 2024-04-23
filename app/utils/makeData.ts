@@ -3,6 +3,7 @@ export type User = {
     firstName: string;
     lastName: string;
     email: string;
+    hourlyRate: number;
     state: string;
 };
 

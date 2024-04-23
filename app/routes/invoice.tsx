@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
 import {db} from '../firebase-service';
-import { collection, doc, getDocs, setDoc, addDoc } from "firebase/firestore";
+import { collection, doc, getDocs, setDoc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import adminApp from '../lib/firebase.admin.server';
 
 import { getAuth } from 'firebase/auth';
@@ -26,9 +26,10 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { type User, fakeData, usStates } from '../utils/makeData';
+import { type User, usStates } from '../utils/makeData';
 import { documentToJson } from '../utils/firestore-utils';
-import {v4 as uuid} from 'uuid';
+// import {v4 as uuid} from 'uuid';
+import anyTrue from '../utils/anyTrue';
 
 import { isSessionValid, sessionLogout } from "~/fb.sessions.server";
 import {useLoaderData} from "@remix-run/react";
@@ -41,6 +42,7 @@ export const links = () => {
 };
 
 // use loader to check for existing session
+// loader is server-side only
 export async function loader({ request }) {
     const { decodedClaims, error } = await isSessionValid(request, "/login");
 
@@ -71,6 +73,7 @@ export async function loader({ request }) {
     return json(data);
 }
 
+// action is server-side only
 export const action = async ({ request }) => {
     const { decodedClaims, error, isAdmin } = await isSessionValid(request, "/login");
     if (!isAdmin) {
@@ -84,12 +87,10 @@ export const action = async ({ request }) => {
 
             const fieldNames = 'name,email,password,phone,role,hourlyRate,street,city,state,postalCode';
 
-            const workerData = fieldNames.split(',').reduce((result, fieldName) => {
-                return {
-                    ...result,
-                    [fieldName]: (formData.get(fieldName) || '').trim(),
-                };
-            }, {});
+            const workerData = fieldNames.split(',').reduce((result, fieldName) => ({
+                ...result,
+                [fieldName]: (formData.get(fieldName) || '').trim(),
+            }), {});
 
             workerData.hourlyRate = parseFloat(workerData.hourlyRate, 10);
 
@@ -106,6 +107,7 @@ export const action = async ({ request }) => {
                 return json({ errors });
             }
 
+            // TODO - implementation (updateUser() is not defined)
             const worker = await updateUser(workerData);
 
             // todo - handle 500 and other server errors
@@ -122,27 +124,27 @@ const Example = () => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string | undefined>>({});
   const data = useLoaderData();
   const [workers, setWorkers] = useState();
-  //keep track of rows that have been edited
+  // keep track of rows that have been edited
   const [editedUsers, setEditedUsers] = useState<Record<string, User>>({});
 
-  //call CREATE hook
+  // call CREATE hook
   const { mutateAsync: createUser, isPending: isCreatingUser } =
       useCreateUser();
-  //call READ hook
+  // call READ hook
   const {
     data: fetchedUsers = [],
     isError: isLoadingUsersError,
     isFetching: isFetchingUsers,
     isLoading: isLoadingUsers,
   } = useGetUsers();
-  //call UPDATE hook
+  // call UPDATE hook
   const { mutateAsync: updateUsers, isPending: isUpdatingUser } =
       useUpdateUsers();
-  //call DELETE hook
+  // call DELETE hook
   const { mutateAsync: deleteUser, isPending: isDeletingUser } =
       useDeleteUser();
 
-  //CREATE action
+  // CREATE action
   const handleCreateUser: MRT_TableOptions<User>['onCreatingRowSave'] = async ({
     values,
     exitCreatingMode,
@@ -152,21 +154,21 @@ const Example = () => {
       setValidationErrors(newValidationErrors);
       return;
     }
-    values.id = uuid();
+    // instead of using our own uuid, we will use the document id returned by firebase firestore.
+    // values.id = uuid();
     setValidationErrors({});
-    await addDoc(collection(db, 'workers'), values);
     await createUser(values);
     exitCreatingMode();
   };
 
-  //UPDATE action
+  // UPDATE action
   const handleSaveUsers = async () => {
     if (Object.values(validationErrors).some((error) => !!error)) return;
     await updateUsers(Object.values(editedUsers));
     setEditedUsers({});
   };
 
-  //DELETE action
+  // DELETE action
   const openDeleteConfirmModal = (row: MRT_Row<User>) =>
       modals.openConfirmModal({
         title: 'Are you sure you want to delete this user?',
@@ -183,12 +185,12 @@ const Example = () => {
 
   const columns = useMemo<MRT_ColumnDef<User>[]>(
       () => [
-        {
-          accessorKey: 'id',
-          header: 'Id',
-          enableEditing: false,
-          size: 80,
-        },
+        // {
+        //   accessorKey: 'id',
+        //   header: 'Id',
+        //   enableEditing: false,
+        //   size: 50,
+        // },
         {
           accessorKey: 'firstName',
           header: 'First Name',
@@ -196,7 +198,7 @@ const Example = () => {
             type: 'text',
             required: true,
             error: validationErrors?.[cell.id],
-            //store edited user in state to be saved later
+            // store edited user in state to be saved later
             onBlur: (event) => {
               const validationError = !validateRequired(event.currentTarget.value)
                   ? 'Required'
@@ -236,7 +238,7 @@ const Example = () => {
             type: 'email',
             required: true,
             error: validationErrors?.[cell.id],
-            //store edited user in state to be saved later
+            // store edited user in state to be saved later
             onBlur: (event) => {
               const validationError = !validateEmail(event.currentTarget.value)
                   ? 'Invalid Email'
@@ -250,12 +252,38 @@ const Example = () => {
           }),
         },
         {
+          accessorKey: 'hourlyRate',
+          header: 'Hourly Rate',
+          mantineEditTextInputProps: ({ cell, row }) => ({
+              type: 'number',
+              required: false,
+              error: validationErrors?.[cell.id],
+              // store edited user in state to be saved later
+              onChange: (event) => {
+                // const validationError = !validateRequired(event.currentTarget.value)
+                //   ? 'Required'
+                //   : undefined;
+                // setValidationErrors({
+                //   ...validationErrors,
+                //   [cell.id]: validationError,
+                // });
+                console.log('hourly rate changed', row.original, event.target.value);
+                // TODO !!! -- keep an array of hourly rates with timestamps.
+                  // ... or .. keep full records of every change to the user with timestamps.
+                setEditedUsers({
+                    ...editedUsers,
+                    [row.id]: {...row.original, hourlyRate: +event.target.value },
+                });
+              },
+          }),
+        },
+        {
           accessorKey: 'state',
           header: 'State',
           editVariant: 'select',
           mantineEditSelectProps: ({ row }) => ({
             data: usStates,
-            //store edited user in state to be saved later
+            // store edited user in state to be saved later
             onChange: (value: any) =>
                 setEditedUsers({
                   ...editedUsers,
@@ -264,7 +292,7 @@ const Example = () => {
           }),
         },
       ],
-          [editedUsers, validationErrors],
+      [editedUsers, validationErrors],
   );
 
   const table = useMantineReactTable({
@@ -333,23 +361,13 @@ const Example = () => {
   });
 
 
-    useEffect(() => {
-        getDocs(collection(db, 'workers')).then((q) => {
-            const nextWorkers = [];
-            q.forEach(item => {
-                nextWorkers.push(item.data());
-            });
-            setWorkers(nextWorkers);
-        });
-    }, []);
-
   return (
       <>
           <MantineReactTable table={table} />
           <div className="ui segment">
               <div className="ui medium header">Querying Firestore Database</div>
-              {(data.responseData || []).map((m) => (
-                  <div className="ui segment" key={m?.id}>
+              {(data.responseData || []).map((m, i) => (
+                  <div className="ui segment" key={i}>
                       <pre>{JSON.stringify(m, null, 4)}</pre>
                   </div>
               ))}
@@ -358,17 +376,23 @@ const Example = () => {
   );
 };
 
-//CREATE hook (post new user to api)
+// CREATE hook (post new user to api)
 function useCreateUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (user: User) => {
-      //send api update request here
-      await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
-      return Promise.resolve();
+      // send api update request here
+      const docRef = await addDoc(collection(db, 'workers'), user);
+      // set local copy of user id to id returned by addDoc.
+      user.id = docRef.id;
+      console.log('create user :: id from firebase', user.id);
+      return new Promise(resolve => resolve());
+      // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
+      // return Promise.resolve();
     },
-    //client side optimistic update
+    // client-side optimistic update
     onMutate: (newUserInfo: User) => {
+        console.log({newUserInfo});
       queryClient.setQueryData(
           ['users'],
           (prevUsers: any) =>
@@ -376,27 +400,27 @@ function useCreateUser() {
                 ...prevUsers,
                 {
                   ...newUserInfo,
-                  id: (Math.random() + 1).toString(36).substring(7),
                 },
               ] as User[],
     );
     },
-    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }), //refetch users after mutation, disabled for demo
+    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }), // refetch users after mutation, disabled for demo
   });
 }
 
-//READ hook (get users from api)
+// READ hook (get users from api)
 function useGetUsers() {
   return useQuery<User[]>({
     queryKey: ['users'],
     queryFn: async () => {
-      //send api request here
+      // send api request here
       // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
       // return Promise.resolve(fakeData);
       const q = await getDocs(collection(db, 'workers')); // .then((q) => {
+        console.log(q);
       const nextWorkers = [];
       q.forEach(item => {
-        nextWorkers.push(item.data());
+        nextWorkers.push({...item.data(), id: item.id});
       });
       return nextWorkers;
     },
@@ -404,21 +428,31 @@ function useGetUsers() {
   });
 }
 
-//UPDATE hook (put users in api)
+// UPDATE hook (put users in api)
 function useUpdateUsers() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (users: User[]) => {
-      //send api update request here
-      await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
-      return Promise.resolve();
+    mutationFn: async (updatedUsers: User[]) => {
+      // send api update request here
+      // await new Promise((resolve) => setTimeout(resolve, 1000)); // fake api call
+      // return Promise.resolve();
+      return Promise.all(updatedUsers.map(updatedUser => {
+        console.log('updateDoc', updatedUser.id, updatedUser.hourlyRate);
+        return updateDoc(doc(db, 'workers', updatedUser.id), updatedUser);
+      }));
     },
-    //client side optimistic update
-    onMutate: (newUsers: User[]) => {
+    // client-side optimistic update
+    onMutate: (updatedUsers: User[]) => {
       queryClient.setQueryData(['users'], (prevUsers: any) =>
           prevUsers?.map((user: User) => {
-            const newUser = newUsers.find((u) => u.id === user.id);
-            return newUser ? newUser : user;
+            // does this user from the prevUsers match any of the ones that were updated?
+            // i.e., is this an updated user?
+            const updatedUser = updatedUsers.find((u) => u.id === user.id);
+            // if so, return the updated version instead of the old version (else, return old version)
+            if (updatedUser) {
+              console.log('updated user', updatedUser.hourlyRate, updatedUser);
+            }
+            return updatedUser ? updatedUser : user;
           }),
       );
     },
@@ -426,19 +460,20 @@ function useUpdateUsers() {
   });
 }
 
-//DELETE hook (delete user in api)
+// DELETE hook (delete user in api)
 function useDeleteUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (userId: string) => {
-      //send api update request here
-      await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
-      return Promise.resolve();
+      // send api update request here
+      // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
+      // return Promise.resolve();
+      return deleteDoc(doc(db, 'workers', userId));
     },
-    //client side optimistic update
+    // client-side optimistic update
     onMutate: (userId: string) => {
       queryClient.setQueryData(['users'], (prevUsers: any) =>
-          prevUsers?.filter((user: User) => user.id !== userId),
+        prevUsers?.filter((user: User) => user.id !== userId),
       );
     },
     // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }), //refetch users after mutation, disabled for demo
@@ -448,26 +483,20 @@ function useDeleteUser() {
 const queryClient = new QueryClient();
 
 const ExampleWithProviders = () => (
-    //Put this with your other react-query providers near root of your app
-    <MantineProvider>
-        <QueryClientProvider client={queryClient}>
-            <ModalsProvider>
-                <Example/>
-            </ModalsProvider>
-        </QueryClientProvider>
-    </MantineProvider>
+  // Put this with your other react-query providers near root of your app
+  <MantineProvider>
+    <QueryClientProvider client={queryClient}>
+      <ModalsProvider>
+        <Example/>
+      </ModalsProvider>
+    </QueryClientProvider>
+  </MantineProvider>
 );
 
 export default ExampleWithProviders;
 
-const validateRequired = (value: string) => !!value?.length;
-const validateEmail = (email: string) =>
-    !!email.length &&
-    email
-        .toLowerCase()
-        .match(
-            /.*?@.*?\..*?$/,
-        );
+const validateRequired = (value: string) => (value || '').trim().length > 0;
+const validateEmail = (email: string) => /.+@.+[.].+$/.test(email);
 
 function validateUser(user: User) {
   return {
