@@ -28,7 +28,8 @@ const { getSession, commitSession, destroySession } =
  * checks that the current session is a valid session be getting the token
  * from the session cookie and validating it with firebase
  *
- * @param {*} param0
+ * @param {*} request
+ * @param {string} redirectTo
  * @returns
  */
 export const isSessionValid = async (request, redirectTo) => {
@@ -42,6 +43,7 @@ export const isSessionValid = async (request, redirectTo) => {
     return {
       success: true,
       decodedClaims,
+      // todo - actually use role-based access control (rbac)
       isAdmin: decodedClaims?.uid === "B1bwZ5eYo6Qhjt9wtSLJHHClaNq2",
     };
   } catch (error) {
@@ -56,8 +58,9 @@ export const isSessionValid = async (request, redirectTo) => {
 /**
  * set the cookie on the header and redirect to the specified route
  *
+ * @param {*} request
  * @param {*} sessionCookie
- * @param {*} redirectTo
+ * @param {string} redirectTo
  * @returns
  */
 const setCookieAndRedirect = async (
@@ -78,8 +81,9 @@ const setCookieAndRedirect = async (
  * login the session by verifying the token, if all is good create/set cookie
  * and redirect to the appropriate route
  *
+ * @param {*} request
  * @param {*} idToken
- * @param {*} redirectTo
+ * @param {string} redirectTo
  * @returns
  */
 export const sessionLogin = async (request, idToken, redirectTo) => {

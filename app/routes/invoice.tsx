@@ -416,8 +416,9 @@ function useGetUsers() {
       // send api request here
       // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
       // return Promise.resolve(fakeData);
+      // TODO - filter by NOT 'isDeleted', as part of implementing SOFT DELETE
       const q = await getDocs(collection(db, 'workers')); // .then((q) => {
-        console.log(q);
+      console.log(q);
       const nextWorkers = [];
       q.forEach(item => {
         nextWorkers.push({...item.data(), id: item.id});
@@ -468,6 +469,8 @@ function useDeleteUser() {
       // send api update request here
       // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
       // return Promise.resolve();
+      // TODO !!! - SOFT DELETE (aka, just mark as deleted, don't actually delete it -- why? because may still need
+      // to be able to reference a worker who is no longer working for you, for historical/tax/other? reasons.
       return deleteDoc(doc(db, 'workers', userId));
     },
     // client-side optimistic update
