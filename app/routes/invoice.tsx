@@ -1,13 +1,13 @@
 import { json } from "@remix-run/node";
 import {db} from '../firebase-service';
-import { collection, doc, getDocs, setDoc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, getDocs, addDoc, updateDoc } from "firebase/firestore";
 import adminApp from '../lib/firebase.admin.server';
 
-import { getAuth } from 'firebase/auth';
 import mantineCoreStyles from '@mantine/core/styles.css';
 import mantineTableStyles from 'mantine-react-table/styles.css'; //make sure MRT styles were imported in your app root (once)
 // import '@mantine/dates/styles.css'; //if using mantine date picker features
-import {useEffect, useMemo, useState} from 'react';
+import mainStyles from '../styles/main.css';
+import {useMemo, useState} from 'react';
 import {
   MantineReactTable,
   // createRow,
@@ -27,17 +27,16 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type User, usStates } from '../utils/makeData';
-import { documentToJson } from '../utils/firestore-utils';
-// import {v4 as uuid} from 'uuid';
 import anyTrue from '../utils/anyTrue';
 
-import { isSessionValid, sessionLogout } from "~/fb.sessions.server";
+import { isSessionValid } from "~/fb.sessions.server";
 import {useLoaderData} from "@remix-run/react";
 
 export const links = () => {
     return [
         { rel: "stylesheet", href: mantineCoreStyles },
         { rel: "stylesheet", href: mantineTableStyles },
+        { rel: "stylesheet", href: mainStyles },
     ];
 };
 
@@ -123,7 +122,6 @@ export const action = async ({ request }) => {
 const Example = () => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string | undefined>>({});
   const data = useLoaderData();
-  const [workers, setWorkers] = useState();
   // keep track of rows that have been edited
   const [editedUsers, setEditedUsers] = useState<Record<string, User>>({});
 
@@ -175,7 +173,7 @@ const Example = () => {
         children: (
             <Text>
               Are you sure you want to delete {row.original.firstName}{' '}
-              {row.original.lastName}? This action cannot be undone.
+              {row.original.lastName}? (This can be undone later if needed.)
             </Text>
         ),
         labels: { confirm: 'Delete', cancel: 'Cancel' },
@@ -404,7 +402,8 @@ function useCreateUser() {
               ] as User[],
     );
     },
-    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }), // refetch users after mutation, disabled for demo
+    // refetch users after mutation, disabled for demo
+    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 }
 
@@ -416,12 +415,15 @@ function useGetUsers() {
       // send api request here
       // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
       // return Promise.resolve(fakeData);
-      // TODO - filter by NOT 'isDeleted', as part of implementing SOFT DELETE
-      const q = await getDocs(collection(db, 'workers')); // .then((q) => {
+      const q = await getDocs(collection(db, 'workers'));
       console.log(q);
       const nextWorkers = [];
       q.forEach(item => {
-        nextWorkers.push({...item.data(), id: item.id});
+          const userData = item.data();
+          // filter by NOT 'isDeleted', implementing SOFT DELETE
+          if (!userData.isDeleted) {
+              nextWorkers.push({...userData, id: item.id});
+          }
       });
       return nextWorkers;
     },
@@ -457,7 +459,8 @@ function useUpdateUsers() {
           }),
       );
     },
-    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }), //refetch users after mutation, disabled for demo
+    // refetch users after mutation, disabled for demo
+    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 }
 
@@ -469,9 +472,9 @@ function useDeleteUser() {
       // send api update request here
       // await new Promise((resolve) => setTimeout(resolve, 1000)); //fake api call
       // return Promise.resolve();
-      // TODO !!! - SOFT DELETE (aka, just mark as deleted, don't actually delete it -- why? because may still need
-      // to be able to reference a worker who is no longer working for you, for historical/tax/other? reasons.
-      return deleteDoc(doc(db, 'workers', userId));
+      // don't actually delete .. just mark as deleted.
+      // return deleteDoc(doc(db, 'workers', userId));
+      return updateDoc(doc(db, 'workers', userId), {isDeleted: true});
     },
     // client-side optimistic update
     onMutate: (userId: string) => {
@@ -479,7 +482,8 @@ function useDeleteUser() {
         prevUsers?.filter((user: User) => user.id !== userId),
       );
     },
-    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }), //refetch users after mutation, disabled for demo
+    // refetch users after mutation, disabled for demo
+    // onSettled: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 }
 

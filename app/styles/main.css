@@ -1,0 +1,12 @@
+/*html,*/
+/*body {*/
+/*    scrollbar-gutter: stable;*/
+/*}*/
+
+body[data-scroll-locked] {
+    padding: 0 !important;
+}
+
+.mantine-Modal-inner {
+    left: 0;
+}
